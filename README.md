@@ -9,9 +9,9 @@
 
 -t -> 线程数默认3
 
-## 推荐使用:
+## 使用方式:
 ```sh
-python m3u8Download.py -u https://youku.cdn7-okzy.com/20200101/16484_79e74112/1000k/hls/index.m3u8 -d d:/backup -t 102
+python m3u8Download.py -u https://up.imgupio.com/demo/birds.m3u8 -d d:/backup -t 102
 ```
 
 
