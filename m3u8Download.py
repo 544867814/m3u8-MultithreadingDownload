@@ -3,6 +3,7 @@ import getopt
 import sys
 import os
 import re
+import math
 import time
 import platform
 import requests
@@ -11,6 +12,7 @@ from pathlib import Path
 from Crypto.Cipher import AES
 from collections import OrderedDict
 from queue import Queue
+import numpy
 import threading
 
 
@@ -43,9 +45,9 @@ class BSDownImg(threading.Thread):
         """ 根据file_line下载m3u8文件 """
         c_fule_name,pd_url=line
         print("开始下载:%s"%pd_url)
-        res = requests.get(pd_url,headers=HEADERS)
-        res.encoding = "utf-8"
         try:
+            res = requests.get(pd_url,headers=HEADERS,timeout=30,stream=True)
+            res.encoding = "utf-8"
             if len(key):  # AES 解密
                 with open(os.path.join(download_path, c_fule_name), 'ab') as f:
                     cryptor = AES.new(key, AES.MODE_CBC, key)
@@ -58,7 +60,11 @@ class BSDownImg(threading.Thread):
                         if chunk:
                             f.write(chunk)
             self.product_queue.get()
-        except ValueError:
+        except :
+            #失败队列重新导入
+            print("失败链接:%s"%pd_url)
+            self.page_queue.put((c_fule_name, pd_url))
+
             # with open(os.path.join(download_path, "error.txt"), 'ab') as f:
             #     f.write(res.content)
             #     f.write("\n")
@@ -73,29 +79,65 @@ def merge_file(path):
     os.chdir(path)
     plat_f = platform.system()
     if "Win" in plat_f:
-        str1 = ""
-        for s in checkDownloadFolder(path):
+        list=checkDownloadFolder(path)
+        n=0
+        list1=[]
+        path = path.replace('/', '\\')
+        while len(list)>50:
+            list = chunk(list, 50)
+            for i in range(0, len(list)):
+                str1 = ""
+                for s in list[i]:
+                    str1 += s + "+"
+                try:
+                    if (str1[-1] == '+'):
+                        str1 = str1[:-1]
+                except:
+                    return ''
+                cmd = f"copy /b {str1} {path}\\merge_{(i+n*50)}.ts"
+                list1.append(f"merge_{(i+n*50)}.ts")
+                os.system(cmd)
+            n=n+1
+        str1=''
+
+        for s in list1:
             str1 += s + "+"
         try:
             if (str1[-1] == '+'):
                 str1 = str1[:-1]
         except:
             return ''
-        path = path.replace('/', '\\')
-        # cmd = f"copy /b {path}\*.ts new.tmp"
-
         cmd = f"copy /b {str1} {path}\\new.tmp"
         os.system(cmd)
         if(os.path.exists(f"{path}\\new.tmp")):
             os.system('del /Q *.ts')
                 # os.system('del /Q *.mp4')
             os.rename(f"{path}\\new.tmp", f"{path}\\new.mp4")
-            print("合并完成")
             os._exit(0)
             return True
 
-        else :
-            print("合并失败")
+        # for s in checkDownloadFolder(path):
+        #     str1 += s + "+"
+        # try:
+        #     if (str1[-1] == '+'):
+        #         str1 = str1[:-1]
+        # except:
+        #     return ''
+        # path = path.replace('/', '\\')
+        # # cmd = f"copy /b {path}\*.ts new.tmp"
+        #
+        # cmd = f"copy /b {str1} {path}\\new.tmp"
+        # os.system(cmd)
+        # if(os.path.exists(f"{path}\\new.tmp")):
+        #     os.system('del /Q *.ts')
+        #         # os.system('del /Q *.mp4')
+        #     os.rename(f"{path}\\new.tmp", f"{path}\\new.mp4")
+        #     print("合并完成")
+        #     os._exit(0)
+        #     return True
+        #
+        # else :
+        #     print("合并失败")
 
 
     elif "Dar" in plat_f:
@@ -107,6 +149,70 @@ def merge_file(path):
         os.system('rm -f *.ts')
         os.rename("new.mp4", "new.ts")
         os.system(f'cat new.ts > new.mp4')
+
+
+
+# def merge_file(path):
+#     """
+#     兼容windows和linux
+#     :param path:
+#     :return:
+#     """
+#     os.chdir(path)
+#     plat_f = platform.system()
+#     if "Win" in plat_f:
+#         str1 = ""
+#         list=checkDownloadFolder(path)
+#         n=1
+#         while len(list)>50:
+#             list = chunk(list, 50)
+#             for i in range(0, len(list)):
+#                 for s in list[i]:
+#                     str1 += s + "+"
+#                 try:
+#                     if (str1[-1] == '+'):
+#                         str1 = str1[:-1]
+#                 except:
+#                     return ''
+#                 path = path.replace('/', '\\')
+#                 cmd = f"copy /b {str1} {path}\\merge_{(i+n*50)}.ts"
+#                 os.system(cmd)
+#             n=n+1
+#
+#
+#         for s in checkDownloadFolder(path):
+#             str1 += s + "+"
+#         try:
+#             if (str1[-1] == '+'):
+#                 str1 = str1[:-1]
+#         except:
+#             return ''
+#         path = path.replace('/', '\\')
+#         # cmd = f"copy /b {path}\*.ts new.tmp"
+#
+#         cmd = f"copy /b {str1} {path}\\new.tmp"
+#         os.system(cmd)
+#         if(os.path.exists(f"{path}\\new.tmp")):
+#             os.system('del /Q *.ts')
+#                 # os.system('del /Q *.mp4')
+#             os.rename(f"{path}\\new.tmp", f"{path}\\new.mp4")
+#             print("合并完成")
+#             os._exit(0)
+#             return True
+#
+#         else :
+#             print("合并失败")
+#
+#
+#     elif "Dar" in plat_f:
+#         str1 = ""
+#         for s in checkDownloadFolder(path):
+#             str1 += s + " "
+#         cmd = f'cat {str1} > new.mp4'
+#         os.system(cmd)
+#         os.system('rm -f *.ts')
+#         os.rename("new.mp4", "new.ts")
+#         os.system(f'cat new.ts > new.mp4')
 
 
 def checkDownloadFolder(download_path, ty=".ts"):
@@ -218,8 +324,29 @@ def createDownloadFolder(download_path):
         os.mkdir(download_path)
     return download_path
 
+def chunk(list,n):
+    '''
+    :param list: 数组项
+    :param n: 代表每组几列
+    :return:
+    '''
+    length=len(list)
+    count=math.ceil(length/n)
+    lists=[]
+    for i in range(0,count):
+        k=i*n
+        item=[]
+        for j in range(k,(n*i+n)):
+            if(j==length):
+                break
+            item.append(list[j])
+        lists.append(item)
+    return lists
+
 if __name__ == "__main__":
-    theread=3 #默认线程数
+    merge_file("D:\\backup\\20200111_142754")
+
+    theread=500 #默认线程数
     document = "" #保存路径
     url = "" #下载地址
     opts, args = getopt.getopt(sys.argv[1:], "u:d:t:")
@@ -235,17 +362,17 @@ if __name__ == "__main__":
         download_dir = document
     else:
         download_dir = os.getcwd() + "/download"
-
+    download_path=createDownloadFolder(download_dir)
     start = time.time()
-    # merge = ""
-    # 测试m3u8
-    # url = "https://up.imgupio.com/demo/birds.m3u8"
-    # #url="https://cdn-5.haku99.com/hls/2019/05/20/UZWZ2mEs/playlist.m3u8"
-    # url="https://youku.cdn7-okzy.com/20200101/16484_79e74112/index.m3u8"
+    # # merge = ""
+    # # 测试m3u8
+    # # url = "https://up.imgupio.com/demo/birds.m3u8"
+    # # #url="https://cdn-5.haku99.com/hls/2019/05/20/UZWZ2mEs/playlist.m3u8"
+    # # url="https://youku.cdn7-okzy.com/20200101/16484_79e74112/index.m3u8"
     # download_dir = "d:/backup"
     # url="https://youku.cdn7-okzy.com/20200101/16484_79e74112/1000k/hls/index.m3u8"
-    download_path=createDownloadFolder(download_dir)
-    #"python m3u8Download.py -u https://youku.cdn7-okzy.com/20200101/16484_79e74112/1000k/hls/index.m3u8 -d d:/backup -t 102"
+
+    # #"python m3u8Download.py -u https://youku.cdn7-okzy.com/20200101/16484_79e74112/1000k/hls/index.m3u8 -d d:/backup -t 102"
     if not url:
         print("请输入下载地址")
     else:
@@ -258,6 +385,7 @@ if __name__ == "__main__":
         t = BSDownImg(page_queue,product_queue,key,download_path)
         t.daemon=True
         t.start()
+        time.sleep(0.2)
         tsk.append(t)
     for tt in tsk:
         tt.join()
