@@ -151,7 +151,7 @@ def merge_file(path):
             os.system('del /Q *.ts')
                 # os.system('del /Q *.mp4')
             os.rename(f"new.tmp", f"new.mp4")
-            # os._exit(0)
+            os._exit(0)
             return True
         # cmd = f"copy /b {str1} {path}\\new.tmp"
         # os.system(cmd)
@@ -312,7 +312,7 @@ def chunk(list,n):
 
 if __name__ == "__main__":
     #merge_file("D:\\backup\\20200210_151649")
-    theread=45 #默认线程数
+    theread=200 #默认线程数
     document = "d:/backup" #保存路径
     url = "" #下载地址
     opts, args = getopt.getopt(sys.argv[1:], "u:d:t:")
